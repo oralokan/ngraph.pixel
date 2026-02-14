@@ -280,6 +280,60 @@ var renderer = renderGraph(graph, {
 });
 ```
 
+## Camera navigation
+
+### How to animate camera to a node?
+
+`showNode(nodeId, stopDistance)` now performs smooth animated movement by default.
+
+``` js
+renderer.showNode('bookmarked-node', 120);
+```
+
+### How to animate camera to an arbitrary frame?
+
+Use `flyToPosition(frame, options)` when you know the viewport frame directly:
+
+``` js
+renderer.flyToPosition({
+  center: { x: 10, y: 20, z: 0 },
+  radius: 150,
+  direction: { x: 0, y: 0, z: 1 } // optional
+}, {
+  durationMs: 600,
+  easing: 'linear' // or custom function t => t
+});
+```
+
+### How to enforce camera bounds from app layer?
+
+Use `onCameraChange(camera, context)` to clamp camera coordinates (for example `z >= 0`):
+
+``` js
+var renderer = renderGraph(graph, {
+  onCameraChange: function (camera, context) {
+    if (camera.position.z < 0) camera.position.z = 0;
+    // context.source can be: input | animation | autofit | api
+  }
+});
+```
+
+### How to control movement speed?
+
+You can set speed once:
+
+``` js
+var renderer = renderGraph(graph, { movementSpeed: 300, rollSpeed: 0.2 });
+```
+
+Or set dynamic speed policy at runtime (e.g. based on camera `z`):
+
+``` js
+renderer.setMovementSpeed(function (camera) {
+  return Math.max(100, camera.position.z * 0.5);
+});
+```
+
 
 # Feedback?
 This is very early version of the library and your feedback is very much appreciated.

@@ -66,6 +66,14 @@ function pixel(graph, options) {
     showNode: showNode,
 
     /**
+     * Requests renderer to move camera to a specific frame.
+     *
+     * @param {object} frame target frame `{center, radius, direction?}`
+     * @param {object+} transitionOptions animation options `{durationMs, easing}`
+     */
+    flyToPosition: flyToPosition,
+
+    /**
      * Allows clients to provide a callback function, which is invoked before
      * each rendering frame
      *
@@ -78,6 +86,13 @@ function pixel(graph, options) {
      * Returns instance of the three.js camera
      */
     camera: getCamera,
+
+    /**
+     * Updates movement speed policy.
+     *
+     * @param {number|function} valueOrFn number speed or `(camera) => number`
+     */
+    setMovementSpeed: setMovementSpeed,
 
     /**
      * Allows clients to set/get current clear color of the scene (the background)
@@ -171,6 +186,7 @@ function pixel(graph, options) {
   var scene, camera, renderer;
   var nodeView, edgeView, autoFitController, input;
   var nodes, edges;
+  var cameraTransition;
   var tooltipView = createTooltipView(container);
 
   init();
@@ -241,6 +257,11 @@ function pixel(graph, options) {
     if (autoFitController) {
       autoFitController.update();
       input.adjustSpeed(autoFitController.lastRadius());
+      notifyCameraChanged('autofit');
+    } else if (cameraTransition) {
+      var done = flyTo.stepTransition(camera, cameraTransition, Date.now());
+      notifyCameraChanged('animation');
+      if (done) cameraTransition = null;
     }
     renderer.render(scene, camera);
   }
@@ -361,8 +382,8 @@ function pixel(graph, options) {
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
 
-    input = createInput(camera, graph, renderer.domElement);
-    input.on('move', stopAutoFit);
+    input = createInput(camera, graph, renderer.domElement, options);
+    input.on('move', inputMoved);
     input.on('nodeover', setTooltip);
     input.on('nodeclick', passthrough('nodeclick'));
     input.on('nodedblclick', passthrough('nodedblclick'));
@@ -416,8 +437,13 @@ function pixel(graph, options) {
     return nodeUI && graph.getNode(nodeUI.id);
   }
 
+  function inputMoved(moveArg) {
+    stopAutoFit();
+    cameraTransition = null;
+    notifyCameraChanged('input', moveArg);
+  }
+
   function stopAutoFit() {
-    input.off('move');
     autoFitController = null;
   }
 
@@ -430,7 +456,9 @@ function pixel(graph, options) {
   function autoFit() {
     if (autoFitController) return; // we are already auto-fitting the graph.
     // otherwise fire and forget autofit:
+    cameraTransition = null;
     createAutoFit(nodeView, camera).update();
+    notifyCameraChanged('autofit');
   }
 
   function getLayout() {
@@ -471,7 +499,49 @@ function pixel(graph, options) {
 
   function showNode(nodeId, stopDistance) {
     stopDistance = typeof stopDistance === 'number' ? stopDistance : 100;
-    flyTo(camera, layout.getNodePosition(nodeId), stopDistance);
+    var center = layout.getNodePosition(nodeId);
+    if (!center) return;
+    return flyToPosition({
+      center: center,
+      radius: stopDistance
+    });
+  }
+
+  function flyToPosition(frame, transitionOptions) {
+    if (!frame || !frame.center || typeof frame.radius !== 'number' || frame.radius <= 0) {
+      throw new Error('flyToPosition() expects frame: { center, radius, direction? }');
+    }
+
+    stopAutoFit();
+    cameraTransition = flyTo.createTransition(camera, frame, transitionOptions, Date.now());
+
+    if (cameraTransition.durationMs === 0) {
+      flyTo.stepTransition(camera, cameraTransition, Date.now());
+      cameraTransition = null;
+      notifyCameraChanged('api');
+    }
+
+    return api;
+  }
+
+  function setMovementSpeed(valueOrFn) {
+    input.setMovementSpeed(valueOrFn);
+    return api;
+  }
+
+  function notifyCameraChanged(source, data) {
+    if (typeof options.onCameraChange === 'function') {
+      options.onCameraChange(camera, {
+        source: source,
+        data: data
+      });
+    }
+
+    input.syncHitTest(true);
+    api.fire('camerachanged', {
+      source: source,
+      camera: camera
+    });
   }
 }
 

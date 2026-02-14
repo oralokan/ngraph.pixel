@@ -49,6 +49,29 @@ function validateOptions(options) {
   options.node = typeof options.node === 'function' ? options.node : defaultNode;
 
   /**
+   * Camera movement speed. Can be a number or function `(camera) => number`.
+   * If omitted, the renderer uses its built-in defaults.
+   */
+  if (typeof options.movementSpeed !== 'number' && typeof options.movementSpeed !== 'function') {
+    options.movementSpeed = undefined;
+  }
+
+  /**
+   * Camera roll speed used by fly controls.
+   */
+  options.rollSpeed = typeof options.rollSpeed === 'number' ? options.rollSpeed : 0.20;
+
+  /**
+   * Optional camera change hook. Invoked after camera has changed and before hit-test sync.
+   *
+   * Signature: `(camera, context) => void`
+   * `context.source` can be one of: `input`, `animation`, `autofit`, `api`.
+   */
+  if (typeof options.onCameraChange !== 'function') {
+    options.onCameraChange = undefined;
+  }
+
+  /**
    * Experimental API: When activeNode is explicitly set to false, then no proxy
    * object is created. Which means actual updates to the node have to be manual
    *
