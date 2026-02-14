@@ -29,7 +29,7 @@ updateStatus();
 
 function wireButtons() {
   document.getElementById('fit').addEventListener('click', function() {
-    renderer.autoFit();
+    flyToGraphBounds();
   });
 
   document.getElementById('bookmark').addEventListener('click', flyToCurrentNode);
@@ -64,6 +64,16 @@ function wireButtons() {
 function flyToCurrentNode() {
   var nodeId = nodeIds[currentNodeIndex];
   renderer.showNode(nodeId, 120);
+}
+
+function flyToGraphBounds() {
+  var sphere = renderer.nodeView().getBoundingSphere();
+  renderer.flyToPosition({
+    center: sphere.center,
+    radius: Math.max(100, sphere.radius)
+  }, {
+    durationMs: 800
+  });
 }
 
 function clampCameraZ(camera) {
