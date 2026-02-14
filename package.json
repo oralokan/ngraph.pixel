@@ -11,7 +11,8 @@
     "colors": "browserify demo/colors/index.js > demo/colors/bundle.js",
     "config": "browserify demo/config/index.js > demo/config/bundle.js",
     "edit": "browserify demo/edit/index.js > demo/edit/bundle.js",
-    "start": "npm run basic && npm run background && npm run colors && npm run config && npm run edit"
+    "camera": "browserify demo/camera-navigation/index.js > demo/camera-navigation/bundle.js",
+    "start": "npm run basic && npm run background && npm run colors && npm run config && npm run edit && npm run camera"
   },
   "keywords": [
     "graph",
