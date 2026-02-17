@@ -497,14 +497,14 @@ function pixel(graph, options) {
     if (sceneElement && typeof sceneElement.focus === 'function') sceneElement.focus();
   }
 
-  function showNode(nodeId, stopDistance) {
+  function showNode(nodeId, stopDistance, transitionOptions) {
     stopDistance = typeof stopDistance === 'number' ? stopDistance : 100;
     var center = layout.getNodePosition(nodeId);
     if (!center) return;
     return flyToPosition({
       center: center,
-      radius: stopDistance
-    });
+      radius: stopDistance,
+    }, transitionOptions);
   }
 
   function flyToPosition(frame, transitionOptions) {

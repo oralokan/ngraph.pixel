@@ -21,7 +21,9 @@ renderer.on('nodeclick', function(node) {
   if (!node) return;
   currentNodeIndex = nodeIds.indexOf(node.id);
   if (currentNodeIndex < 0) currentNodeIndex = 0;
-  renderer.showNode(node.id, 120);
+  renderer.showNode(node.id, 120, {
+    durationMs: 2000,
+  });
 });
 
 wireButtons();
@@ -63,7 +65,9 @@ function wireButtons() {
 
 function flyToCurrentNode() {
   var nodeId = nodeIds[currentNodeIndex];
-  renderer.showNode(nodeId, 120);
+  renderer.showNode(nodeId, 120, {
+    durationMs: 2000,
+  });
 }
 
 function flyToGraphBounds() {
