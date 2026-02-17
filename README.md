@@ -290,6 +290,16 @@ var renderer = renderGraph(graph, {
 renderer.showNode('bookmarked-node', 120);
 ```
 
+Optional third argument can include transition and plane-lock options:
+
+``` js
+renderer.showNode('bookmarked-node', 120, {
+  durationMs: 700,
+  planeNormal: { x: 0, y: 0, z: 1 },
+  finalZ: 200
+});
+```
+
 ### How to animate camera to an arbitrary frame?
 
 Use `flyToPosition(frame, options)` when you know the viewport frame directly:
@@ -304,6 +314,38 @@ renderer.flyToPosition({
   easing: 'linear' // or custom function t => t
 });
 ```
+
+`frame` also supports plane-locked targeting:
+
+- `planeNormal`: final camera view is aligned to `-planeNormal`
+- `distanceAlongNormal`: distance from center along `+planeNormal`
+- `finalZ`: world-space `camera.position.z` override (wins over `distanceAlongNormal`)
+
+If `planeNormal` is present and `finalZ`/`distanceAlongNormal` is provided, these new depth fields override `radius`.
+
+Example for XY-plane applications:
+
+``` js
+renderer.flyToPosition({
+  center: { x: 10, y: 20, z: 0 },
+  planeNormal: { x: 0, y: 0, z: 1 },
+  finalZ: 180
+}, {
+  durationMs: 700
+});
+```
+
+Example for arbitrary plane orientation:
+
+``` js
+renderer.flyToPosition({
+  center: { x: 0, y: 0, z: 0 },
+  planeNormal: { x: 0, y: Math.sqrt(3)/2, z: 0.5 },
+  distanceAlongNormal: 240
+});
+```
+
+Note: `finalZ` requires `planeNormal.z` to be non-zero, and resulting camera position must stay on `+planeNormal` side.
 
 ### How to enforce camera bounds from app layer?
 

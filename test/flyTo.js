@@ -61,3 +61,108 @@ test('stepTransition reaches exact target pose', function(t) {
   t.ok(Math.abs(camera.position.z - targetPose.position.z) < 1e-8, 'z ends at target');
   t.end();
 });
+
+test('plane normal enforces view direction and +normal side', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(100, 50, 10);
+
+  var pose = flyTo.resolveFramePose(camera, {
+    center: {x: 1, y: 2, z: 3},
+    planeNormal: {x: 0, y: 0, z: 1},
+    distanceAlongNormal: 150
+  });
+
+  t.equal(pose.position.x, 1, 'camera x aligned with center on +normal offset');
+  t.equal(pose.position.y, 2, 'camera y aligned with center on +normal offset');
+  t.equal(pose.position.z, 153, 'camera moved to +normal side');
+  t.equal(pose.lookAt.z - pose.position.z, -150, 'look direction is opposite normal');
+  t.end();
+});
+
+test('finalZ sets z and has precedence over distanceAlongNormal', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 200);
+
+  var pose = flyTo.resolveFramePose(camera, {
+    center: {x: 5, y: 6, z: 10},
+    planeNormal: {x: 0, y: 0, z: 1},
+    distanceAlongNormal: 400,
+    finalZ: 80
+  });
+
+  t.equal(pose.position.z, 80, 'finalZ wins over distanceAlongNormal');
+  t.equal(pose.position.x, 5, 'x remains centered on XY plane normal');
+  t.equal(pose.position.y, 6, 'y remains centered on XY plane normal');
+  t.end();
+});
+
+test('finalZ works for non-XY plane with non-zero z in normal', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 100);
+
+  var center = {x: 0, y: 0, z: 0};
+  var normal = {x: 0, y: Math.sqrt(3) / 2, z: 0.5}; // already unit
+  var pose = flyTo.resolveFramePose(camera, {
+    center: center,
+    planeNormal: normal,
+    finalZ: 50
+  });
+
+  t.ok(Math.abs(pose.position.z - 50) < 1e-8, 'finalZ is matched');
+  t.ok(pose.position.y > 0, 'camera stayed on +normal side');
+  t.end();
+});
+
+test('radius used when planeNormal exists but no depth fields', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 10);
+
+  var pose = flyTo.resolveFramePose(camera, {
+    center: {x: 0, y: 0, z: 0},
+    planeNormal: {x: 0, y: 0, z: 1},
+    radius: 100
+  });
+  var expectedOffset = 100 / Math.tan(Math.PI / 180.0 * camera.fov * 0.5);
+
+  t.ok(Math.abs(pose.position.z - expectedOffset) < 1e-8, 'radius fallback used along +normal');
+  t.end();
+});
+
+test('validation errors for invalid plane-locked inputs', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 100);
+
+  t.throws(function() {
+    flyTo.resolveFramePose(camera, {
+      center: {x: 0, y: 0, z: 0},
+      planeNormal: {x: 0, y: 0, z: 0},
+      distanceAlongNormal: 10
+    });
+  }, /non-zero length/, 'zero-length normal rejected');
+
+  t.throws(function() {
+    flyTo.resolveFramePose(camera, {
+      center: {x: 0, y: 0, z: 0},
+      planeNormal: {x: 1, y: 0, z: 0},
+      finalZ: 10
+    });
+  }, /non-zero/, 'finalZ with near-zero normal.z rejected');
+
+  t.throws(function() {
+    flyTo.resolveFramePose(camera, {
+      center: {x: 0, y: 0, z: 10},
+      planeNormal: {x: 0, y: 0, z: 1},
+      finalZ: 0
+    });
+  }, /negative normal side/, 'finalZ that flips side rejected');
+
+  t.throws(function() {
+    flyTo.resolveFramePose(camera, {
+      center: {x: 0, y: 0, z: 0},
+      planeNormal: {x: 0, y: 0, z: 1},
+      distanceAlongNormal: -1
+    });
+  }, /non-negative/, 'negative distanceAlongNormal rejected');
+
+  t.end();
+});

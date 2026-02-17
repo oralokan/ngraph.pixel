@@ -497,19 +497,35 @@ function pixel(graph, options) {
     if (sceneElement && typeof sceneElement.focus === 'function') sceneElement.focus();
   }
 
-  function showNode(nodeId, stopDistance, transitionOptions) {
+  function showNode(nodeId, stopDistance, options) {
     stopDistance = typeof stopDistance === 'number' ? stopDistance : 100;
+    options = options || {};
     var center = layout.getNodePosition(nodeId);
     if (!center) return;
-    return flyToPosition({
+
+    var frame = {
       center: center,
-      radius: stopDistance,
-    }, transitionOptions);
+      radius: stopDistance
+    };
+    if (options.planeNormal) frame.planeNormal = options.planeNormal;
+    if (typeof options.distanceAlongNormal === 'number') frame.distanceAlongNormal = options.distanceAlongNormal;
+    if (typeof options.finalZ === 'number') frame.finalZ = options.finalZ;
+
+    return flyToPosition({
+      center: frame.center,
+      radius: frame.radius,
+      planeNormal: frame.planeNormal,
+      distanceAlongNormal: frame.distanceAlongNormal,
+      finalZ: frame.finalZ,
+    }, {
+      durationMs: options.durationMs,
+      easing: options.easing
+    });
   }
 
   function flyToPosition(frame, transitionOptions) {
-    if (!frame || !frame.center || typeof frame.radius !== 'number' || frame.radius <= 0) {
-      throw new Error('flyToPosition() expects frame: { center, radius, direction? }');
+    if (!frame || !frame.center) {
+      throw new Error('flyToPosition() expects frame with center and framing fields');
     }
 
     stopAutoFit();

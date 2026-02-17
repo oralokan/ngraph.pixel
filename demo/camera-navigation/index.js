@@ -23,6 +23,8 @@ renderer.on('nodeclick', function(node) {
   if (currentNodeIndex < 0) currentNodeIndex = 0;
   renderer.showNode(node.id, 120, {
     durationMs: 2000,
+    planeNormal: {x: 0, y: 0, z: 1},
+    finalZ: getTargetZ()
   });
 });
 
@@ -45,8 +47,9 @@ function wireButtons() {
     var sphere = renderer.nodeView().getBoundingSphere();
     renderer.flyToPosition({
       center: sphere.center,
-      radius: Math.max(120, sphere.radius),
-      direction: { x: 0, y: 0, z: 1 }
+      planeNormal: { x: 0, y: 0, z: 1 },
+      finalZ: getTargetZ(),
+      radius: Math.max(120, sphere.radius)
     }, {
       durationMs: 800
     });
@@ -61,12 +64,18 @@ function wireButtons() {
     });
     updateStatus();
   });
+
+  document.getElementById('depth').addEventListener('input', function() {
+    updateStatus();
+  });
 }
 
 function flyToCurrentNode() {
   var nodeId = nodeIds[currentNodeIndex];
   renderer.showNode(nodeId, 120, {
     durationMs: 2000,
+    planeNormal: {x: 0, y: 0, z: 1},
+    finalZ: getTargetZ()
   });
 }
 
@@ -74,6 +83,8 @@ function flyToGraphBounds() {
   var sphere = renderer.nodeView().getBoundingSphere();
   renderer.flyToPosition({
     center: sphere.center,
+    planeNormal: {x: 0, y: 0, z: 1},
+    finalZ: getTargetZ(),
     radius: Math.max(100, sphere.radius)
   }, {
     durationMs: 800
@@ -95,12 +106,18 @@ function speedFromZ(camera) {
 function updateStatus() {
   var camera = renderer.camera();
   var speedValue = document.getElementById('speed').value;
+  var depthValue = document.getElementById('depth').value;
   statusLine.textContent = [
     'camera: (' + camera.position.x.toFixed(1) + ', ' + camera.position.y.toFixed(1) + ', ' + camera.position.z.toFixed(1) + ')',
     'bookmark: ' + nodeIds[currentNodeIndex],
+    'target z: ' + depthValue,
     'speed base: ' + speedValue,
     'z clamp: enabled (z >= 0)'
   ].join(' | ');
+}
+
+function getTargetZ() {
+  return parseFloat(document.getElementById('depth').value);
 }
 
 function getGraphFromQueryString(query) {

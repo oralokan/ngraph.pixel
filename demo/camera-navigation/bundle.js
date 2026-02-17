@@ -24,6 +24,8 @@ renderer.on('nodeclick', function(node) {
   if (currentNodeIndex < 0) currentNodeIndex = 0;
   renderer.showNode(node.id, 120, {
     durationMs: 2000,
+    planeNormal: {x: 0, y: 0, z: 1},
+    finalZ: getTargetZ()
   });
 });
 
@@ -46,8 +48,9 @@ function wireButtons() {
     var sphere = renderer.nodeView().getBoundingSphere();
     renderer.flyToPosition({
       center: sphere.center,
-      radius: Math.max(120, sphere.radius),
-      direction: { x: 0, y: 0, z: 1 }
+      planeNormal: { x: 0, y: 0, z: 1 },
+      finalZ: getTargetZ(),
+      radius: Math.max(120, sphere.radius)
     }, {
       durationMs: 800
     });
@@ -62,12 +65,18 @@ function wireButtons() {
     });
     updateStatus();
   });
+
+  document.getElementById('depth').addEventListener('input', function() {
+    updateStatus();
+  });
 }
 
 function flyToCurrentNode() {
   var nodeId = nodeIds[currentNodeIndex];
   renderer.showNode(nodeId, 120, {
     durationMs: 2000,
+    planeNormal: {x: 0, y: 0, z: 1},
+    finalZ: getTargetZ()
   });
 }
 
@@ -75,6 +84,8 @@ function flyToGraphBounds() {
   var sphere = renderer.nodeView().getBoundingSphere();
   renderer.flyToPosition({
     center: sphere.center,
+    planeNormal: {x: 0, y: 0, z: 1},
+    finalZ: getTargetZ(),
     radius: Math.max(100, sphere.radius)
   }, {
     durationMs: 800
@@ -96,12 +107,18 @@ function speedFromZ(camera) {
 function updateStatus() {
   var camera = renderer.camera();
   var speedValue = document.getElementById('speed').value;
+  var depthValue = document.getElementById('depth').value;
   statusLine.textContent = [
     'camera: (' + camera.position.x.toFixed(1) + ', ' + camera.position.y.toFixed(1) + ', ' + camera.position.z.toFixed(1) + ')',
     'bookmark: ' + nodeIds[currentNodeIndex],
+    'target z: ' + depthValue,
     'speed base: ' + speedValue,
     'z clamp: enabled (z >= 0)'
   ].join(' | ');
+}
+
+function getTargetZ() {
+  return parseFloat(document.getElementById('depth').value);
 }
 
 function getGraphFromQueryString(query) {
@@ -615,19 +632,35 @@ function pixel(graph, options) {
     if (sceneElement && typeof sceneElement.focus === 'function') sceneElement.focus();
   }
 
-  function showNode(nodeId, stopDistance, transitionOptions) {
+  function showNode(nodeId, stopDistance, options) {
     stopDistance = typeof stopDistance === 'number' ? stopDistance : 100;
+    options = options || {};
     var center = layout.getNodePosition(nodeId);
     if (!center) return;
-    return flyToPosition({
+
+    var frame = {
       center: center,
-      radius: stopDistance,
-    }, transitionOptions);
+      radius: stopDistance
+    };
+    if (options.planeNormal) frame.planeNormal = options.planeNormal;
+    if (typeof options.distanceAlongNormal === 'number') frame.distanceAlongNormal = options.distanceAlongNormal;
+    if (typeof options.finalZ === 'number') frame.finalZ = options.finalZ;
+
+    return flyToPosition({
+      center: frame.center,
+      radius: frame.radius,
+      planeNormal: frame.planeNormal,
+      distanceAlongNormal: frame.distanceAlongNormal,
+      finalZ: frame.finalZ,
+    }, {
+      durationMs: options.durationMs,
+      easing: options.easing
+    });
   }
 
   function flyToPosition(frame, transitionOptions) {
-    if (!frame || !frame.center || typeof frame.radius !== 'number' || frame.radius <= 0) {
-      throw new Error('flyToPosition() expects frame: { center, radius, direction? }');
+    if (!frame || !frame.center) {
+      throw new Error('flyToPosition() expects frame with center and framing fields');
     }
 
     stopAutoFit();
@@ -890,6 +923,7 @@ function edgeView(scene, options) {
  * Camera framing helpers for instant and animated camera movement.
  */
 var THREE = require('three');
+var EPSILON = 1e-8;
 
 module.exports = flyTo;
 module.exports.resolveFramePose = resolveFramePose;
@@ -911,9 +945,17 @@ function flyTo(camera, to, radius, direction) {
 
 function resolveFramePose(camera, frame) {
   var center = frame.center;
+  if (!isFiniteVector(center)) {
+    throw new Error('frame.center should be a finite vector');
+  }
+
+  if (frame.planeNormal) {
+    return resolvePlaneLockedPose(camera, frame, center);
+  }
+
   var radius = frame.radius;
-  if (!center || typeof radius !== 'number' || radius <= 0) {
-    throw new Error('frame.center and positive frame.radius are required');
+  if (typeof radius !== 'number' || radius <= 0) {
+    throw new Error('frame.radius should be a positive number');
   }
 
   var offset = radius / Math.tan(Math.PI / 180.0 * camera.fov * 0.5);
@@ -932,6 +974,52 @@ function resolveFramePose(camera, frame) {
       z: center.z
     }
   };
+}
+
+function resolvePlaneLockedPose(camera, frame, center) {
+  var normal = normalizeVector(frame.planeNormal, 'frame.planeNormal');
+  var distanceFromCenter = getDistanceFromPlaneNormalMode(camera, frame, center, normal);
+
+  return {
+    position: {
+      x: center.x + normal.x * distanceFromCenter,
+      y: center.y + normal.y * distanceFromCenter,
+      z: center.z + normal.z * distanceFromCenter
+    },
+    lookAt: {
+      x: center.x,
+      y: center.y,
+      z: center.z
+    }
+  };
+}
+
+function getDistanceFromPlaneNormalMode(camera, frame, center, normal) {
+  if (typeof frame.finalZ === 'number') {
+    if (!isFinite(frame.finalZ)) throw new Error('frame.finalZ should be a finite number');
+    if (Math.abs(normal.z) < EPSILON) {
+      throw new Error('frame.finalZ requires planeNormal.z to be non-zero');
+    }
+
+    var t = (frame.finalZ - center.z) / normal.z;
+    if (!isFinite(t)) throw new Error('frame.finalZ produced invalid distance');
+    if (t < 0) {
+      throw new Error('frame.finalZ places camera on negative normal side');
+    }
+    return t;
+  }
+
+  if (typeof frame.distanceAlongNormal === 'number') {
+    if (!isFinite(frame.distanceAlongNormal) || frame.distanceAlongNormal < 0) {
+      throw new Error('frame.distanceAlongNormal should be a non-negative finite number');
+    }
+    return frame.distanceAlongNormal;
+  }
+
+  if (typeof frame.radius !== 'number' || frame.radius <= 0) {
+    throw new Error('frame.radius should be positive when planeNormal depth is not provided');
+  }
+  return frame.radius / Math.tan(Math.PI / 180.0 * camera.fov * 0.5);
 }
 
 function applyPose(camera, pose) {
@@ -1031,6 +1119,30 @@ function getDirectionVector(camera, center, direction) {
     y: y / length,
     z: z / length
   };
+}
+
+function normalizeVector(vector, name) {
+  if (!isFiniteVector(vector)) {
+    throw new Error(name + ' should be a finite vector');
+  }
+
+  var length = Math.sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+  if (length < EPSILON) {
+    throw new Error(name + ' should have non-zero length');
+  }
+
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+    z: vector.z / length
+  };
+}
+
+function isFiniteVector(vector) {
+  return !!vector &&
+    isFinite(vector.x) &&
+    isFinite(vector.y) &&
+    isFinite(vector.z);
 }
 
 },{"three":50}],8:[function(require,module,exports){
