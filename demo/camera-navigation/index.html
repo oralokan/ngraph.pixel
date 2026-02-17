@@ -37,6 +37,17 @@ body {
   margin: 4px 4px 4px 0;
 }
 
+#controls .row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+#controls .row input {
+  width: 74px;
+}
+
 #controls label {
   display: block;
   margin: 8px 0 4px;
@@ -46,6 +57,16 @@ body {
   margin: 8px 0 0;
   font-size: 12px;
   line-height: 1.4;
+}
+
+#status {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  font-size: 11px;
+  line-height: 1.35;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px;
+  border-radius: 4px;
 }
   </style>
 </head>
@@ -57,11 +78,28 @@ body {
       <button id="next">Next bookmark</button>
       <button id="top">Top-down fly</button>
     </div>
+    <label>flyCameraTo target position</label>
+    <div class="row">
+      <input id="targetX" type="number" step="1" value="0" aria-label="target x">
+      <input id="targetY" type="number" step="1" value="0" aria-label="target y">
+      <input id="targetZ" type="number" step="1" value="200" aria-label="target z">
+      <button id="goToPosition">Go</button>
+      <button id="useCurrentPosition">Use current pos</button>
+    </div>
+    <label>flyCameraTo target direction</label>
+    <div class="row">
+      <input id="targetDx" type="number" step="0.01" value="0" aria-label="target dx">
+      <input id="targetDy" type="number" step="0.01" value="0" aria-label="target dy">
+      <input id="targetDz" type="number" step="0.01" value="-1" aria-label="target dz">
+      <button id="useCurrentDirection">Use current dir</button>
+    </div>
+    <label for="transitionMs">Transition duration (ms)</label>
+    <input id="transitionMs" type="number" min="0" step="50" value="1200">
     <label for="speed">Base movement speed</label>
     <input id="speed" type="range" min="20" max="400" step="10" value="80">
     <label for="depth">Target camera z for programmatic fly</label>
     <input id="depth" type="range" min="10" max="1200" step="10" value="260">
-    <p id="status"></p>
+    <pre id="status"></pre>
     <p>Click nodes to trigger animated <code>showNode()</code> with plane lock (<code>normal={0,0,1}</code>). WASD + mouse look still works.</p>
   </div>
   <script src="bundle.js"></script>

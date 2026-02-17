@@ -347,6 +347,32 @@ renderer.flyToPosition({
 
 Note: `finalZ` requires `planeNormal.z` to be non-zero, and resulting camera position must stay on `+planeNormal` side.
 
+### How to animate camera to explicit camera state?
+
+Use `flyCameraTo(targetCameraState, options)` when you want direct control over
+target camera position and orientation:
+
+``` js
+renderer.flyCameraTo({
+  position: { x: 0, y: 0, z: 200 },
+  direction: { x: 0, y: 0, z: -1 } // optional if lookAt is provided
+}, {
+  durationMs: 700,
+  easing: 'linear'
+});
+```
+
+You can also provide `lookAt` directly:
+
+``` js
+renderer.flyCameraTo({
+  position: { x: 100, y: 50, z: 200 },
+  lookAt: { x: 100, y: 50, z: 0 }
+});
+```
+
+If neither `direction` nor `lookAt` is provided, current camera direction is preserved.
+
 ### How to enforce camera bounds from app layer?
 
 Use `onCameraChange(camera, context)` to clamp camera coordinates (for example `z >= 0`):

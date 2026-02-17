@@ -12,6 +12,9 @@
     "config": "browserify demo/config/index.js > demo/config/bundle.js",
     "edit": "browserify demo/edit/index.js > demo/edit/bundle.js",
     "camera": "browserify demo/camera-navigation/index.js > demo/camera-navigation/bundle.js",
+    "camera:watch": "npx watchify demo/camera-navigation/index.js -o demo/camera-navigation/bundle.js -v",
+    "camera:serve": "npx browser-sync start --server --files \"demo/camera-navigation/index.html,demo/camera-navigation/bundle.js\" --startPath \"demo/camera-navigation/index.html\" --no-open",
+    "camera:dev": "npx concurrently -k \"npm:camera:watch\" \"npm:camera:serve\"",
     "start": "npm run basic && npm run background && npm run colors && npm run config && npm run edit && npm run camera"
   },
   "keywords": [

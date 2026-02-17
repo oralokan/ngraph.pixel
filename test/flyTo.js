@@ -166,3 +166,89 @@ test('validation errors for invalid plane-locked inputs', function(t) {
 
   t.end();
 });
+
+test('resolveCameraStatePose supports direction-based target', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 100);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+  var pose = flyTo.resolveCameraStatePose(camera, {
+    position: {x: 10, y: 20, z: 30},
+    direction: {x: 0, y: 0, z: -2}
+  });
+
+  t.equal(pose.position.x, 10, 'position x is used');
+  t.equal(pose.position.y, 20, 'position y is used');
+  t.equal(pose.position.z, 30, 'position z is used');
+  t.equal(pose.lookAt.x, 10, 'lookAt x comes from normalized direction');
+  t.equal(pose.lookAt.y, 20, 'lookAt y comes from normalized direction');
+  t.equal(pose.lookAt.z, 29, 'lookAt z comes from normalized direction');
+  t.end();
+});
+
+test('resolveCameraStatePose supports explicit lookAt and preserves direction by default', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 100);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+  var explicit = flyTo.resolveCameraStatePose(camera, {
+    position: {x: 1, y: 2, z: 3},
+    lookAt: {x: 4, y: 5, z: 6}
+  });
+  t.equal(explicit.lookAt.x, 4, 'explicit lookAt x is used');
+  t.equal(explicit.lookAt.y, 5, 'explicit lookAt y is used');
+  t.equal(explicit.lookAt.z, 6, 'explicit lookAt z is used');
+
+  var preserved = flyTo.resolveCameraStatePose(camera, {
+    position: {x: 7, y: 8, z: 9}
+  });
+  t.equal(preserved.lookAt.x, 7, 'default keeps current direction x');
+  t.equal(preserved.lookAt.y, 8, 'default keeps current direction y');
+  t.equal(preserved.lookAt.z, 8, 'default keeps current direction z');
+  t.end();
+});
+
+test('createTransitionToCameraState reaches target state', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 100);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+  var transition = flyTo.createTransitionToCameraState(camera, {
+    position: {x: 50, y: 60, z: 70},
+    lookAt: {x: 10, y: 20, z: 30}
+  }, {
+    durationMs: 200,
+    easing: 'linear'
+  }, 1000);
+
+  var done = flyTo.stepTransition(camera, transition, 1200);
+  t.equal(done, true, 'transition is complete');
+  t.equal(camera.position.x, 50, 'x reached target');
+  t.equal(camera.position.y, 60, 'y reached target');
+  t.equal(camera.position.z, 70, 'z reached target');
+
+  var direction = camera.getWorldDirection(new THREE.Vector3());
+  var expectedDirection = new THREE.Vector3(10 - 50, 20 - 60, 30 - 70).normalize();
+  t.ok(Math.abs(direction.x - expectedDirection.x) < 1e-7, 'direction x reached target');
+  t.ok(Math.abs(direction.y - expectedDirection.y) < 1e-7, 'direction y reached target');
+  t.ok(Math.abs(direction.z - expectedDirection.z) < 1e-7, 'direction z reached target');
+  t.end();
+});
+
+test('resolveCameraStatePose validates inputs', function(t) {
+  var camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+  camera.position.set(0, 0, 100);
+
+  t.throws(function() {
+    flyTo.resolveCameraStatePose(camera, {});
+  }, /position/, 'position is required');
+
+  t.throws(function() {
+    flyTo.resolveCameraStatePose(camera, {
+      position: {x: 0, y: 0, z: 0},
+      direction: {x: 0, y: 0, z: 0}
+    });
+  }, /non-zero/, 'zero direction is rejected');
+
+  t.end();
+});

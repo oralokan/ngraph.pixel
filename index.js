@@ -74,6 +74,14 @@ function pixel(graph, options) {
     flyToPosition: flyToPosition,
 
     /**
+     * Requests renderer to move camera to explicit camera state.
+     *
+     * @param {object} targetCameraState target state `{position, lookAt?|direction?}`
+     * @param {object+} transitionOptions animation options `{durationMs, easing}`
+     */
+    flyCameraTo: flyCameraTo,
+
+    /**
      * Allows clients to provide a callback function, which is invoked before
      * each rendering frame
      *
@@ -530,6 +538,19 @@ function pixel(graph, options) {
 
     stopAutoFit();
     cameraTransition = flyTo.createTransition(camera, frame, transitionOptions, Date.now());
+
+    if (cameraTransition.durationMs === 0) {
+      flyTo.stepTransition(camera, cameraTransition, Date.now());
+      cameraTransition = null;
+      notifyCameraChanged('api');
+    }
+
+    return api;
+  }
+
+  function flyCameraTo(targetCameraState, transitionOptions) {
+    stopAutoFit();
+    cameraTransition = flyTo.createTransitionToCameraState(camera, targetCameraState, transitionOptions, Date.now());
 
     if (cameraTransition.durationMs === 0) {
       flyTo.stepTransition(camera, cameraTransition, Date.now());

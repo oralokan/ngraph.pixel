@@ -1,6 +1,7 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 var query = require('query-string').parse(window.location.search.substring(1));
 var renderGraph = require('../..');
+var THREE = renderGraph.THREE;
 var graph = getGraphFromQueryString(query);
 
 var nodeIds = [];
@@ -16,6 +17,12 @@ var renderer = renderGraph(graph, {
 
 var currentNodeIndex = 0;
 var statusLine = document.getElementById('status');
+var targetX = document.getElementById('targetX');
+var targetY = document.getElementById('targetY');
+var targetZ = document.getElementById('targetZ');
+var targetDx = document.getElementById('targetDx');
+var targetDy = document.getElementById('targetDy');
+var targetDz = document.getElementById('targetDz');
 
 renderer.on('camerachanged', updateStatus);
 renderer.on('nodeclick', function(node) {
@@ -23,13 +30,15 @@ renderer.on('nodeclick', function(node) {
   currentNodeIndex = nodeIds.indexOf(node.id);
   if (currentNodeIndex < 0) currentNodeIndex = 0;
   renderer.showNode(node.id, 120, {
-    durationMs: 2000,
+    durationMs: getTransitionDuration(),
     planeNormal: {x: 0, y: 0, z: 1},
     finalZ: getTargetZ()
   });
 });
 
 wireButtons();
+setPositionInputsFromCamera();
+setDirectionInputsFromCamera();
 updateStatus();
 
 function wireButtons() {
@@ -38,6 +47,15 @@ function wireButtons() {
   });
 
   document.getElementById('bookmark').addEventListener('click', flyToCurrentNode);
+  document.getElementById('goToPosition').addEventListener('click', flyToTypedPosition);
+  document.getElementById('useCurrentPosition').addEventListener('click', function() {
+    setPositionInputsFromCamera();
+    updateStatus();
+  });
+  document.getElementById('useCurrentDirection').addEventListener('click', function() {
+    setDirectionInputsFromCamera();
+    updateStatus();
+  });
 
   document.getElementById('next').addEventListener('click', function() {
     currentNodeIndex = (currentNodeIndex + 1) % nodeIds.length;
@@ -52,7 +70,7 @@ function wireButtons() {
       finalZ: getTargetZ(),
       radius: Math.max(120, sphere.radius)
     }, {
-      durationMs: 800
+      durationMs: getTransitionDuration()
     });
   });
 
@@ -69,12 +87,16 @@ function wireButtons() {
   document.getElementById('depth').addEventListener('input', function() {
     updateStatus();
   });
+
+  document.getElementById('transitionMs').addEventListener('input', function() {
+    updateStatus();
+  });
 }
 
 function flyToCurrentNode() {
   var nodeId = nodeIds[currentNodeIndex];
   renderer.showNode(nodeId, 120, {
-    durationMs: 2000,
+    durationMs: getTransitionDuration(),
     planeNormal: {x: 0, y: 0, z: 1},
     finalZ: getTargetZ()
   });
@@ -88,8 +110,41 @@ function flyToGraphBounds() {
     finalZ: getTargetZ(),
     radius: Math.max(100, sphere.radius)
   }, {
-    durationMs: 800
+    durationMs: getTransitionDuration()
   });
+}
+
+function flyToTypedPosition() {
+  var x = parseFloat(targetX.value);
+  var y = parseFloat(targetY.value);
+  var z = parseFloat(targetZ.value);
+  var dx = parseFloat(targetDx.value);
+  var dy = parseFloat(targetDy.value);
+  var dz = parseFloat(targetDz.value);
+  if (!isFinite(x) || !isFinite(y) || !isFinite(z)) return;
+  if (!isFinite(dx) || !isFinite(dy) || !isFinite(dz)) return;
+  if (dx === 0 && dy === 0 && dz === 0) return;
+
+  renderer.flyCameraTo({
+    position: { x: x, y: y, z: z },
+    direction: { x: dx, y: dy, z: dz }
+  }, {
+    durationMs: getTransitionDuration()
+  });
+}
+
+function setPositionInputsFromCamera() {
+  var camera = renderer.camera();
+  targetX.value = camera.position.x.toFixed(1);
+  targetY.value = camera.position.y.toFixed(1);
+  targetZ.value = camera.position.z.toFixed(1);
+}
+
+function setDirectionInputsFromCamera() {
+  var direction = renderer.camera().getWorldDirection(new THREE.Vector3());
+  targetDx.value = direction.x.toFixed(4);
+  targetDy.value = direction.y.toFixed(4);
+  targetDz.value = direction.z.toFixed(4);
 }
 
 function clampCameraZ(camera) {
@@ -106,19 +161,40 @@ function speedFromZ(camera) {
 
 function updateStatus() {
   var camera = renderer.camera();
+  var direction = camera.getWorldDirection(new THREE.Vector3());
+  var lookAt = {
+    x: camera.position.x + direction.x,
+    y: camera.position.y + direction.y,
+    z: camera.position.z + direction.z
+  };
   var speedValue = document.getElementById('speed').value;
   var depthValue = document.getElementById('depth').value;
+  var transitionValue = document.getElementById('transitionMs').value;
+  var targetDirection = '(' + targetDx.value + ', ' + targetDy.value + ', ' + targetDz.value + ')';
   statusLine.textContent = [
-    'camera: (' + camera.position.x.toFixed(1) + ', ' + camera.position.y.toFixed(1) + ', ' + camera.position.z.toFixed(1) + ')',
+    'position: (' + camera.position.x.toFixed(3) + ', ' + camera.position.y.toFixed(3) + ', ' + camera.position.z.toFixed(3) + ')',
+    'direction: (' + direction.x.toFixed(6) + ', ' + direction.y.toFixed(6) + ', ' + direction.z.toFixed(6) + ')',
+    'lookAt: (' + lookAt.x.toFixed(3) + ', ' + lookAt.y.toFixed(3) + ', ' + lookAt.z.toFixed(3) + ')',
+    'up: (' + camera.up.x.toFixed(3) + ', ' + camera.up.y.toFixed(3) + ', ' + camera.up.z.toFixed(3) + ')',
+    'projection: fov=' + camera.fov.toFixed(2) + ' aspect=' + camera.aspect.toFixed(4) +
+      ' near=' + camera.near.toFixed(3) + ' far=' + camera.far.toFixed(1),
     'bookmark: ' + nodeIds[currentNodeIndex],
     'target z: ' + depthValue,
+    'typed target direction: ' + targetDirection,
+    'transition ms: ' + transitionValue,
     'speed base: ' + speedValue,
     'z clamp: enabled (z >= 0)'
-  ].join(' | ');
+  ].join('\n');
 }
 
 function getTargetZ() {
   return parseFloat(document.getElementById('depth').value);
+}
+
+function getTransitionDuration() {
+  var duration = parseFloat(document.getElementById('transitionMs').value);
+  if (!isFinite(duration) || duration < 0) return 800;
+  return duration;
 }
 
 function getGraphFromQueryString(query) {
@@ -207,6 +283,14 @@ function pixel(graph, options) {
      * @param {object+} transitionOptions animation options `{durationMs, easing}`
      */
     flyToPosition: flyToPosition,
+
+    /**
+     * Requests renderer to move camera to explicit camera state.
+     *
+     * @param {object} targetCameraState target state `{position, lookAt?|direction?}`
+     * @param {object+} transitionOptions animation options `{durationMs, easing}`
+     */
+    flyCameraTo: flyCameraTo,
 
     /**
      * Allows clients to provide a callback function, which is invoked before
@@ -675,6 +759,19 @@ function pixel(graph, options) {
     return api;
   }
 
+  function flyCameraTo(targetCameraState, transitionOptions) {
+    stopAutoFit();
+    cameraTransition = flyTo.createTransitionToCameraState(camera, targetCameraState, transitionOptions, Date.now());
+
+    if (cameraTransition.durationMs === 0) {
+      flyTo.stepTransition(camera, cameraTransition, Date.now());
+      cameraTransition = null;
+      notifyCameraChanged('api');
+    }
+
+    return api;
+  }
+
   function setMovementSpeed(valueOrFn) {
     input.setMovementSpeed(valueOrFn);
     return api;
@@ -929,8 +1026,10 @@ module.exports = flyTo;
 module.exports.resolveFramePose = resolveFramePose;
 module.exports.applyPose = applyPose;
 module.exports.createTransition = createTransition;
+module.exports.createTransitionToCameraState = createTransitionToCameraState;
 module.exports.stepTransition = stepTransition;
 module.exports.resolveEasing = resolveEasing;
+module.exports.resolveCameraStatePose = resolveCameraStatePose;
 
 function flyTo(camera, to, radius, direction) {
   var pose = resolveFramePose(camera, {
@@ -1031,6 +1130,15 @@ function applyPose(camera, pose) {
 
 function createTransition(camera, frame, options, now) {
   var targetPose = resolveFramePose(camera, frame);
+  return createTransitionWithPose(camera, targetPose, options, now);
+}
+
+function createTransitionToCameraState(camera, cameraState, options, now) {
+  var targetPose = resolveCameraStatePose(camera, cameraState);
+  return createTransitionWithPose(camera, targetPose, options, now);
+}
+
+function createTransitionWithPose(camera, targetPose, options, now) {
   var startDirection = camera.getWorldDirection(new THREE.Vector3());
   var startLookAt = {
     x: camera.position.x + startDirection.x,
@@ -1052,6 +1160,50 @@ function createTransition(camera, frame, options, now) {
     startedAt: typeof now === 'number' ? now : Date.now(),
     durationMs: durationMs,
     easing: resolveEasing(options && options.easing)
+  };
+}
+
+function resolveCameraStatePose(camera, cameraState) {
+  if (!cameraState || !isFiniteVector(cameraState.position)) {
+    throw new Error('cameraState.position should be a finite vector');
+  }
+
+  var targetPosition = {
+    x: cameraState.position.x,
+    y: cameraState.position.y,
+    z: cameraState.position.z
+  };
+
+  var targetLookAt;
+  if (cameraState.lookAt) {
+    if (!isFiniteVector(cameraState.lookAt)) {
+      throw new Error('cameraState.lookAt should be a finite vector');
+    }
+    targetLookAt = {
+      x: cameraState.lookAt.x,
+      y: cameraState.lookAt.y,
+      z: cameraState.lookAt.z
+    };
+  } else if (cameraState.direction) {
+    var normalizedDirection = normalizeVector(cameraState.direction, 'cameraState.direction');
+    targetLookAt = {
+      x: targetPosition.x + normalizedDirection.x,
+      y: targetPosition.y + normalizedDirection.y,
+      z: targetPosition.z + normalizedDirection.z
+    };
+  } else {
+    // If no direction is provided, preserve current camera orientation.
+    var currentDirection = camera.getWorldDirection(new THREE.Vector3());
+    targetLookAt = {
+      x: targetPosition.x + currentDirection.x,
+      y: targetPosition.y + currentDirection.y,
+      z: targetPosition.z + currentDirection.z
+    };
+  }
+
+  return {
+    position: targetPosition,
+    lookAt: targetLookAt
   };
 }
 
